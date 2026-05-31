@@ -111,6 +111,19 @@ describe("TypeScript scheduler", () => {
     expect(bookends["resident-1"].has(5)).toBe(false);
   });
 
+  it("does not create bookends from weekend-only vacation dates", () => {
+    const payload = examplePayload();
+    payload.pool["2025-08-30"]["resident-1"] = "vacation";
+    payload.pool["2025-08-31"]["resident-1"] = "vacation";
+
+    const bookends = getVacationBookends(payload);
+    const result = scheduleWithJs(payload);
+
+    expect([...bookends["resident-1"]]).toEqual([]);
+    expect(result.metrics.totals.vacationBookendWeekends).toBe(0);
+    expect(result.metrics.totals.vacationBookendWeekendsGranted).toBe(0);
+  });
+
   it("preserves locked assignments inside a locked date range", () => {
     const payload = examplePayload();
     payload.assignments = {

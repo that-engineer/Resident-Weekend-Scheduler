@@ -499,10 +499,16 @@ textarea {
   background: linear-gradient(135deg, #fde2e2 0 50%, #fff1b8 50% 100%);
 }
 
+.schedule-cell.vacation:not(.assigned) {
+  background: #f7d7d9;
+  color: #8a2630;
+}
+
 .shift-row.locked-row .date-cell,
 .schedule-cell.locked-empty,
 .schedule-cell.locked-empty.bookend-hint,
-.schedule-cell.locked-empty.requested-off-hint {
+.schedule-cell.locked-empty.requested-off-hint,
+.schedule-cell.locked-empty.vacation {
   background: #9ca3aa;
   color: #ffffff;
 }
