@@ -64,7 +64,9 @@ Create a resident weekend scheduler that runs as a static GitHub Pages site and 
 ## State Import And Export
 - The primary state file is JSON and is exported from a clearly labeled "Export Schedule Data to Save for Later" action.
 - Exported state includes app version, date range, residents, notes, pool statuses, assignments, manual assignment flags, locked ranges, and optimizer settings.
+- Exported state includes generated schedule metrics only while they still match the current resident roster, date range, and painted pool/vacation statuses.
 - Imported state should normalize unknown pool statuses to empty and preserve compatible data.
+- Imported schedule metrics should be restored only when their validity signature matches the imported state.
 - Schedule image export is a separate action from JSON state export and does not include editable app state.
 
 ## Testing Expectations

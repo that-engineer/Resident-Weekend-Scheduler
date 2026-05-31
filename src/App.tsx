@@ -17,6 +17,7 @@ import type {
   PoolStatus,
   Resident,
   SchedulerMetrics,
+  SchedulerMetricsSnapshot,
   SchedulerPayload,
   ShiftDateRow,
   TableRow,
@@ -29,9 +30,10 @@ import {
   STATUS_DESCRIPTIONS,
   STATUS_LABELS,
   createInitialState,
+  createSchedulerMetricsSnapshot,
   createResident,
   getPoolStatus,
-  parseImportedState,
+  parseImportedStateWithMetrics,
   serializeState,
   setPoolCell,
 } from "./lib/state";
@@ -58,7 +60,7 @@ function App() {
   const [imageRange, setImageRange] = useState(() => state.dateRange);
   const [lockRange, setLockRange] = useState(() => state.dateRange);
   const [hideLockedDates, setHideLockedDates] = useState(false);
-  const [schedulerMetrics, setSchedulerMetrics] = useState<SchedulerMetrics | null>(null);
+  const [schedulerMetricsSnapshot, setSchedulerMetricsSnapshot] = useState<SchedulerMetricsSnapshot | null>(null);
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
   const [schedulerStatus, setSchedulerStatus] = useState<"idle" | "running" | "error">("idle");
   const [schedulerMessage, setSchedulerMessage] = useState("");
@@ -74,6 +76,7 @@ function App() {
     [hideLockedDates, rows, state.lockedRanges, view],
   );
   const validationIssues = useMemo(() => validateAssignments(state, weekends), [state, weekends]);
+  const schedulerMetrics = schedulerMetricsSnapshot?.metrics ?? null;
 
   const addResident = () => {
     if (!residentDraft.name.trim()) {
@@ -84,6 +87,7 @@ function App() {
       ...current,
       residents: [...current.residents, resident],
     }));
+    setSchedulerMetricsSnapshot(null);
     setResidentDraft({ name: "", note: "" });
     setIsDialogOpen(false);
   };
@@ -104,9 +108,11 @@ function App() {
       ...current,
       [field]: value,
     }));
+    setSchedulerMetricsSnapshot(null);
   };
 
   const paintCell = (date: string, residentId: string) => {
+    setSchedulerMetricsSnapshot(null);
     setState((current) => ({
       ...current,
       pool: setPoolCell(current.pool, date, residentId, paintMode),
@@ -117,6 +123,7 @@ function App() {
     if (paintMode !== "vacation" && paintMode !== "empty") {
       return;
     }
+    setSchedulerMetricsSnapshot(null);
     setState((current) => ({
       ...current,
       vacationWeeks: {
@@ -189,7 +196,12 @@ function App() {
           [row.weekendId]: nextAssignment,
         },
       };
-      setSchedulerMetrics(calculateScheduleMetrics(buildSchedulerPayload(nextState), nextState.assignments, schedulerMetrics?.score ?? 0));
+      setSchedulerMetricsSnapshot(
+        createSchedulerMetricsSnapshot(
+          nextState,
+          calculateScheduleMetrics(buildSchedulerPayload(nextState), nextState.assignments, schedulerMetrics?.score ?? 0),
+        ),
+      );
       setSchedulerStatus("idle");
       setSchedulerMessage(
         isClearingManualTwentyFour || isClearingManualTwelve
@@ -236,7 +248,7 @@ function App() {
           randomSeed: runSeed,
         },
       }));
-      setSchedulerMetrics(result.metrics);
+      setSchedulerMetricsSnapshot(createSchedulerMetricsSnapshot({ ...state, assignments: result.assignments }, result.metrics));
       setView("schedule");
       setSchedulerStatus("idle");
       setSchedulerMessage(
@@ -255,7 +267,7 @@ function App() {
   };
 
   const exportState = () => {
-    const blob = new Blob([serializeState(state)], { type: "application/json" });
+    const blob = new Blob([serializeState(state, schedulerMetricsSnapshot)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -277,11 +289,11 @@ function App() {
     }
     try {
       const text = await file.text();
-      const importedState = parseImportedState(text);
+      const { state: importedState, schedulerMetrics: importedMetrics } = parseImportedStateWithMetrics(text);
       setState(importedState);
       setImageRange(importedState.dateRange);
       setLockRange(importedState.dateRange);
-      setSchedulerMetrics(null);
+      setSchedulerMetricsSnapshot(importedMetrics);
       setIsMetricsDialogOpen(false);
       setSchedulerStatus("idle");
       setSchedulerMessage("State imported.");
