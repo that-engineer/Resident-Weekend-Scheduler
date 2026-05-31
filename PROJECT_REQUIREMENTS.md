@@ -32,6 +32,7 @@ Create a resident weekend scheduler that runs as a static GitHub Pages site and 
 
 ## User Interface
 - The app has two primary views: Pool Set and Weekend Schedule.
+- The top bar includes a centered button-style link to the GitHub README documentation.
 - Both views use a table as the primary visual.
 - Table rows are shift dates, with a non-selectable week separator row before each weekend.
 - Table columns are residents.

@@ -39,9 +39,9 @@ button:disabled {
   align-items: center;
   background: #ffffff;
   border-bottom: 1px solid #ddd8cf;
-  display: flex;
+  display: grid;
   gap: 24px;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   padding: 18px 24px;
 }
 
@@ -71,6 +71,11 @@ button:disabled {
   margin: 3px 0 0;
 }
 
+.top-center {
+  display: flex;
+  justify-content: center;
+}
+
 .top-actions,
 .control-band,
 .settings-band,
@@ -81,6 +86,10 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.top-actions {
+  justify-content: flex-end;
 }
 
 .control-band,
@@ -202,6 +211,10 @@ textarea {
   background: #ffffff;
   border-color: #cfc7bc;
   color: #202427;
+}
+
+.icon-text {
+  text-decoration: none;
 }
 
 .icon-button {
@@ -763,7 +776,11 @@ textarea {
 
   .top-bar {
     align-items: flex-start;
-    flex-direction: column;
+  }
+
+  .top-center,
+  .top-actions {
+    justify-content: flex-start;
   }
 
   .mode-panel {

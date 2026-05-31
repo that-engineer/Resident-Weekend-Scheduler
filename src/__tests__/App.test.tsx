@@ -4,6 +4,16 @@ import { describe, expect, it } from "vitest";
 import App from "../App";
 
 describe("Resident Weekend Scheduler UI", () => {
+  it("links to the GitHub README from the top bar", () => {
+    render(<App />);
+
+    const readmeLink = screen.getByRole("link", { name: "README" });
+    expect(readmeLink).toHaveAttribute(
+      "href",
+      "https://github.com/that-engineer/Resident-Weekend-Scheduler/blob/main/README.md",
+    );
+  });
+
   it("adds a resident from the Pool Set header control", async () => {
     const user = userEvent.setup();
     render(<App />);

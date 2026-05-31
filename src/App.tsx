@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BookOpen,
   CalendarDays,
   FileImage,
   Save,
@@ -361,6 +362,17 @@ function App() {
             <h1>Resident Weekend Scheduler</h1>
             <p>Pool setup, weekend call optimization, and portable state files.</p>
           </div>
+        </div>
+        <div className="top-center">
+          <a
+            className="icon-text readme-link"
+            href="https://github.com/that-engineer/Resident-Weekend-Scheduler/blob/main/README.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <BookOpen aria-hidden="true" />
+            README
+          </a>
         </div>
         <div className="top-actions">
           <button className="icon-text" type="button" onClick={() => fileInputRef.current?.click()}>
