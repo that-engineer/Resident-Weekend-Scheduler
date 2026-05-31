@@ -242,18 +242,6 @@ export function getVacationBookends(payload: SchedulerPayload) {
         }
         bookends[resident.id].add(index);
       }
-
-      const hasWeekendVacation =
-        getStatus(payload, weekend.saturday, resident.id) === "vacation" ||
-        getStatus(payload, weekend.sunday, resident.id) === "vacation";
-      if (hasWeekendVacation) {
-        if (index > 0) {
-          bookends[resident.id].add(index - 1);
-        }
-        if (index + 1 < payload.weekends.length) {
-          bookends[resident.id].add(index + 1);
-        }
-      }
     });
   });
 

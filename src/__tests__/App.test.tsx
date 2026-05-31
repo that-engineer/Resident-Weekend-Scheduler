@@ -42,6 +42,20 @@ describe("Resident Weekend Scheduler UI", () => {
     expect(screen.getByRole("button", { name: "Erase Clear painted cells" })).toBeInTheDocument();
   });
 
+  it("shows weekend vacation cells as vacation in the schedule view", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Add resident" }));
+    await user.type(screen.getByLabelText("Name"), "Dr. Ada");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Vacation Hard unavailable" }));
+    await user.click(screen.getAllByTitle("Not marked")[0]);
+    await user.click(screen.getByRole("button", { name: "Weekend Schedule" }));
+
+    expect(screen.getAllByTitle("Assign Dr. Ada")[0]).toHaveClass("vacation");
+  });
+
   it("keeps a manual first-resident assignment in the first resident column", async () => {
     const user = userEvent.setup();
     render(<App />);

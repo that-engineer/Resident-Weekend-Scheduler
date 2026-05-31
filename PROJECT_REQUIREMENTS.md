@@ -58,6 +58,7 @@ Create a resident weekend scheduler that runs as a static GitHub Pages site and 
 - The view displays schedule metrics related to the optimization goals, including assigned hours, opportunity hours, 24-hour counts, spacing, and exception counts.
 - Users can open a metrics charts pop-up from the Weekend Schedule view showing resident utilization rate, 24-hour shifts per 36 pool hours, golden weekend percentage, vacation bookends granted, requested days off granted, and recovery goldens granted.
 - The table visually hints vacation bookend weekends with light red cells and requested-off weekends with light yellow cells, but these hints are UI-only and are not included in schedule image exports.
+- Vacation painted directly on Saturday/Sunday dates appears as vacation on those Weekend Schedule cells, but does not create vacation bookend weekends.
 - The image export date range can be set manually or by selecting a calendar month.
 - Users can lock a date range so existing assignments in that range are preserved on future optimizer runs.
 - Users can hide locked dates in the Weekend Schedule table.
