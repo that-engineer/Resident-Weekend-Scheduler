@@ -124,6 +124,11 @@ export interface SchedulerMetrics {
   };
 }
 
+export interface SchedulerMetricsSnapshot {
+  inputSignature: string;
+  metrics: SchedulerMetrics;
+}
+
 export interface SchedulerResult {
   assignments: Record<string, Assignment>;
   warnings: string[];

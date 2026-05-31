@@ -1,4 +1,11 @@
-import type { AppState, OptimizerSettings, PoolStatus, Resident } from "../types";
+import type {
+  AppState,
+  OptimizerSettings,
+  PoolStatus,
+  Resident,
+  SchedulerMetrics,
+  SchedulerMetricsSnapshot,
+} from "../types";
 import { buildDefaultDateRange } from "./dateUtils";
 
 export const DEFAULT_SETTINGS: OptimizerSettings = {
@@ -66,8 +73,46 @@ export function getPoolStatus(pool: AppState["pool"], date: string, residentId: 
   return pool[date]?.[residentId] ?? "empty";
 }
 
-export function serializeState(state: AppState): string {
-  return JSON.stringify(state, null, 2);
+interface PersistedState extends AppState {
+  schedulerMetrics?: SchedulerMetricsSnapshot;
+}
+
+export function createMetricsInputSignature(state: AppState): string {
+  return hashString(
+    JSON.stringify({
+      version: 1,
+      dateRange: state.dateRange,
+      residents: state.residents.map((resident) => ({
+        id: resident.id,
+        name: resident.name,
+        note: resident.note,
+      })),
+      pool: normalizePoolForSignature(state.pool),
+      vacationWeeks: normalizeVacationWeeksForSignature(state.vacationWeeks),
+    }),
+  );
+}
+
+export function createSchedulerMetricsSnapshot(
+  state: AppState,
+  metrics: SchedulerMetrics,
+): SchedulerMetricsSnapshot {
+  return {
+    inputSignature: createMetricsInputSignature(state),
+    metrics,
+  };
+}
+
+export function isSchedulerMetricsSnapshotValid(state: AppState, snapshot: SchedulerMetricsSnapshot | null) {
+  return Boolean(snapshot && snapshot.inputSignature === createMetricsInputSignature(state));
+}
+
+export function serializeState(state: AppState, schedulerMetrics?: SchedulerMetricsSnapshot | null): string {
+  const persistedState: PersistedState = { ...state };
+  if (isSchedulerMetricsSnapshotValid(state, schedulerMetrics ?? null)) {
+    persistedState.schedulerMetrics = schedulerMetrics ?? undefined;
+  }
+  return JSON.stringify(persistedState, null, 2);
 }
 
 function normalizePoolStatus(value: unknown): PoolStatus {
@@ -78,7 +123,14 @@ function normalizePoolStatus(value: unknown): PoolStatus {
 }
 
 export function parseImportedState(raw: string): AppState {
-  const parsed = JSON.parse(raw) as Partial<AppState>;
+  return parseImportedStateWithMetrics(raw).state;
+}
+
+export function parseImportedStateWithMetrics(raw: string): {
+  state: AppState;
+  schedulerMetrics: SchedulerMetricsSnapshot | null;
+} {
+  const parsed = JSON.parse(raw) as Partial<PersistedState>;
   if (!parsed || typeof parsed !== "object") {
     throw new Error("The selected file does not contain scheduler state.");
   }
@@ -106,7 +158,7 @@ export function parseImportedState(raw: string): AppState {
     });
   }
 
-  return {
+  const state: AppState = {
     version: 1,
     dateRange: {
       start: parsed.dateRange?.start || buildDefaultDateRange().start,
@@ -138,4 +190,82 @@ export function parseImportedState(raw: string): AppState {
       ...(parsed.settings ?? {}),
     },
   };
+
+  const schedulerMetrics = parseSchedulerMetricsSnapshot(parsed.schedulerMetrics);
+  return {
+    state,
+    schedulerMetrics: isSchedulerMetricsSnapshotValid(state, schedulerMetrics) ? schedulerMetrics : null,
+  };
+}
+
+function normalizePoolForSignature(pool: AppState["pool"]) {
+  return Object.fromEntries(
+    Object.entries(pool)
+      .map(
+        ([date, residentMap]): [string, Record<string, PoolStatus>] => [
+          date,
+          Object.fromEntries(
+            Object.entries(residentMap)
+              .filter(([, status]) => status !== "empty")
+              .sort(([left], [right]) => left.localeCompare(right)),
+          ),
+        ],
+      )
+      .filter(([, residentMap]) => Object.keys(residentMap).length > 0)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function normalizeVacationWeeksForSignature(vacationWeeks: AppState["vacationWeeks"]) {
+  return Object.fromEntries(
+    Object.entries(vacationWeeks)
+      .map(
+        ([weekendId, residentMap]): [string, Record<string, boolean>] => [
+          weekendId,
+          Object.fromEntries(
+            Object.entries(residentMap)
+              .filter(([, isVacation]) => isVacation)
+              .sort(([left], [right]) => left.localeCompare(right)),
+          ),
+        ],
+      )
+      .filter(([, residentMap]) => Object.keys(residentMap).length > 0)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function parseSchedulerMetricsSnapshot(value: unknown): SchedulerMetricsSnapshot | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const snapshot = value as Partial<SchedulerMetricsSnapshot>;
+  if (typeof snapshot.inputSignature !== "string" || !isSchedulerMetrics(snapshot.metrics)) {
+    return null;
+  }
+  return {
+    inputSignature: snapshot.inputSignature,
+    metrics: snapshot.metrics,
+  };
+}
+
+function isSchedulerMetrics(value: unknown): value is SchedulerMetrics {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const metrics = value as Partial<SchedulerMetrics>;
+  return (
+    metrics.engine === "typescript" &&
+    Array.isArray(metrics.residentMetrics) &&
+    Boolean(metrics.totals) &&
+    typeof metrics.totals === "object"
+  );
+}
+
+function hashString(value: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
