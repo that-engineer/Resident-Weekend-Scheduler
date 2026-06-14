@@ -1,7 +1,17 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import App from "../App";
+import {
+  LOCAL_STATE_STORAGE_KEY,
+  createInitialState,
+  saveLocalState,
+  serializeState,
+} from "../lib/state";
+
+beforeEach(() => {
+  localStorage.clear();
+});
 
 describe("Resident Weekend Scheduler UI", () => {
   it("links to the GitHub README from the top bar", () => {
@@ -25,6 +35,78 @@ describe("Resident Weekend Scheduler UI", () => {
 
     expect(screen.getByRole("columnheader", { name: "Dr. Ada PGY-2" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("restores saved browser data on render", () => {
+    saveLocalState(buildSavedState("Dr. Ada", "PGY-2"));
+
+    render(<App />);
+
+    expect(screen.getByRole("columnheader", { name: "Dr. Ada PGY-2" })).toBeInTheDocument();
+  });
+
+  it("auto-saves scheduler data to localStorage", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: "Add resident" }));
+    await user.type(screen.getByLabelText("Name"), "Dr. Ada");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(localStorage.getItem(LOCAL_STATE_STORAGE_KEY)).toContain("Dr. Ada");
+    });
+  });
+
+  it("replaces the browser save when importing scheduler data", async () => {
+    const importedState = buildSavedState("Dr. Grace", "PGY-3");
+    const importedJson = serializeState(importedState);
+    const file = new File([importedJson], "scheduler-state.json", {
+      type: "application/json",
+    });
+    Object.defineProperty(file, "text", {
+      value: () => Promise.resolve(importedJson),
+    });
+    render(<App />);
+
+    const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } });
+
+    expect(await screen.findByRole("columnheader", { name: "Dr. Grace PGY-3" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(localStorage.getItem(LOCAL_STATE_STORAGE_KEY)).toContain("Dr. Grace");
+    });
+  });
+
+  it("clears the browser save and resets the scheduler", async () => {
+    const user = userEvent.setup();
+    saveLocalState(buildSavedState("Dr. Ada", "PGY-2"));
+    render(<App />);
+
+    expect(screen.getByRole("columnheader", { name: "Dr. Ada PGY-2" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear Browser Save" }));
+
+    let dialog = screen.getByRole("dialog", { name: "Clear Schedule Data" });
+    expect(screen.getByRole("columnheader", { name: "Dr. Ada PGY-2" })).toBeInTheDocument();
+    expect(localStorage.getItem(LOCAL_STATE_STORAGE_KEY)).toContain("Dr. Ada");
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog", { name: "Clear Schedule Data" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Dr. Ada PGY-2" })).toBeInTheDocument();
+    expect(localStorage.getItem(LOCAL_STATE_STORAGE_KEY)).toContain("Dr. Ada");
+
+    await user.click(screen.getByRole("button", { name: "Clear Browser Save" }));
+    dialog = screen.getByRole("dialog", { name: "Clear Schedule Data" });
+    await user.click(within(dialog).getByRole("button", { name: "Clear Data" }));
+
+    expect(screen.queryByRole("columnheader", { name: "Dr. Ada PGY-2" })).not.toBeInTheDocument();
+    expect(screen.getByText("Saved browser data cleared.")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(localStorage.getItem(LOCAL_STATE_STORAGE_KEY)).toBeNull();
+    });
   });
 
   it("switches to the schedule view", async () => {
@@ -105,3 +187,10 @@ describe("Resident Weekend Scheduler UI", () => {
     expect(screen.getAllByText("Dr. Ada").length).toBeGreaterThan(0);
   });
 });
+
+function buildSavedState(name: string, note: string) {
+  return {
+    ...createInitialState(new Date(2026, 5, 1)),
+    residents: [{ id: "r1", name, note }],
+  };
+}

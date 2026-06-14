@@ -7,7 +7,8 @@ Create a resident weekend scheduler that runs as a static GitHub Pages site and 
 - The frontend is a Vite, React, and TypeScript static app suitable for GitHub Pages deployment.
 - The optimizer is TypeScript running directly in the static browser app.
 - There is no hosted database, login system, or server persistence in v1.
-- JSON import/export is the source of portable persistence.
+- Browser localStorage is the source of same-device persistence.
+- JSON import/export is the source of portable backup and cross-device persistence.
 - The app can export the visible schedule as a PNG image for a user-selected date window.
 
 ## Core Scheduling Model
@@ -63,17 +64,22 @@ Create a resident weekend scheduler that runs as a static GitHub Pages site and 
 - Users can lock a date range so existing assignments in that range are preserved on future optimizer runs.
 - Users can hide locked dates in the Weekend Schedule table.
 
-## State Import And Export
-- The primary state file is JSON and is exported from a clearly labeled "Export Schedule Data to Save for Later" action.
+## State Persistence, Import, And Export
+- The app automatically saves editable scheduler state to localStorage in the current browser.
+- On page load, valid saved browser state should be restored without requiring the user to import a file.
+- A clear browser save action should remove the localStorage save and reset the app to a fresh empty scheduler state.
+- The portable state file is JSON and is exported from a clearly labeled backup/export action.
 - Exported state includes app version, date range, residents, notes, pool statuses, assignments, manual assignment flags, locked ranges, and optimizer settings.
 - Exported state includes generated schedule metrics only while they still match the current resident roster, date range, and painted pool/vacation statuses.
 - Imported state should normalize unknown pool statuses to empty and preserve compatible data.
 - Imported schedule metrics should be restored only when their validity signature matches the imported state.
+- Imported state should replace the same-device browser save.
+- Malformed browser-saved state should not block app startup; the app should ignore it, clear it, and start fresh.
 - Schedule image export is a separate action from JSON state export and does not include editable app state.
 
 ## Testing Expectations
 - Unit test date-range weekend generation and week separator rows.
-- Unit test JSON import/export round trips.
+- Unit test JSON import/export and browser localStorage round trips.
 - Unit test selected-date filtering for schedule image exports.
 - Unit test the TypeScript scheduler for shift completion, locked assignment preservation, requested-off/vacation behavior, and performance timing.
 - Verify the app builds as static GitHub Pages output.

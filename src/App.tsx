@@ -7,10 +7,11 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
-import { ChangeEvent, PointerEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import type {
   AppState,
   Assignment,
@@ -34,7 +35,10 @@ import {
   createSchedulerMetricsSnapshot,
   createResident,
   getPoolStatus,
+  clearLocalState,
+  loadLocalState,
   parseImportedStateWithMetrics,
+  saveLocalState,
   serializeState,
   setPoolCell,
 } from "./lib/state";
@@ -51,7 +55,8 @@ const MODES: Array<{ status: PoolStatus; label: string; detail: string }> = [
 ];
 
 function App() {
-  const [state, setState] = useState<AppState>(() => createInitialState());
+  const [localState] = useState(() => loadLocalState());
+  const [state, setState] = useState<AppState>(() => localState?.state ?? createInitialState());
   const [view, setView] = useState<ViewMode>("pool");
   const [paintMode, setPaintMode] = useState<PoolStatus>("inPool");
   const [isPainting, setIsPainting] = useState(false);
@@ -61,11 +66,15 @@ function App() {
   const [imageRange, setImageRange] = useState(() => state.dateRange);
   const [lockRange, setLockRange] = useState(() => state.dateRange);
   const [hideLockedDates, setHideLockedDates] = useState(false);
-  const [schedulerMetricsSnapshot, setSchedulerMetricsSnapshot] = useState<SchedulerMetricsSnapshot | null>(null);
+  const [schedulerMetricsSnapshot, setSchedulerMetricsSnapshot] = useState<SchedulerMetricsSnapshot | null>(
+    () => localState?.schedulerMetrics ?? null,
+  );
   const [isMetricsDialogOpen, setIsMetricsDialogOpen] = useState(false);
+  const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const [schedulerStatus, setSchedulerStatus] = useState<"idle" | "running" | "error">("idle");
   const [schedulerMessage, setSchedulerMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const skipNextLocalSaveRef = useRef(false);
 
   const weekends = useMemo(
     () => generateWeekends(state.dateRange.start, state.dateRange.end),
@@ -78,6 +87,14 @@ function App() {
   );
   const validationIssues = useMemo(() => validateAssignments(state, weekends), [state, weekends]);
   const schedulerMetrics = schedulerMetricsSnapshot?.metrics ?? null;
+
+  useEffect(() => {
+    if (skipNextLocalSaveRef.current) {
+      skipNextLocalSaveRef.current = false;
+      return;
+    }
+    saveLocalState(state, schedulerMetricsSnapshot);
+  }, [schedulerMetricsSnapshot, state]);
 
   const addResident = () => {
     if (!residentDraft.name.trim()) {
@@ -306,6 +323,27 @@ function App() {
     }
   };
 
+  const resetLocalData = () => {
+    const freshState = createInitialState();
+    skipNextLocalSaveRef.current = true;
+    clearLocalState();
+    setState(freshState);
+    setView("pool");
+    setPaintMode("inPool");
+    setIsPainting(false);
+    setIsDialogOpen(false);
+    setResidentDraft({ name: "", note: "" });
+    setShowSettings(false);
+    setImageRange(freshState.dateRange);
+    setLockRange(freshState.dateRange);
+    setHideLockedDates(false);
+    setSchedulerMetricsSnapshot(null);
+    setIsMetricsDialogOpen(false);
+    setIsClearDialogOpen(false);
+    setSchedulerStatus("idle");
+    setSchedulerMessage("Saved browser data cleared.");
+  };
+
   const updateSetting = (field: keyof OptimizerSettings, value: number) => {
     setState((current) => ({
       ...current,
@@ -381,7 +419,11 @@ function App() {
           </button>
           <button className="icon-text" type="button" onClick={exportState}>
             <Save aria-hidden="true" />
-            Export Schedule Data to Save for Later
+            Export Backup Data
+          </button>
+          <button className="icon-text" type="button" onClick={() => setIsClearDialogOpen(true)}>
+            <Trash2 aria-hidden="true" />
+            Clear Browser Save
           </button>
           <input
             ref={fileInputRef}
@@ -629,6 +671,31 @@ function App() {
               </button>
               <button type="button" className="primary" onClick={addResident} disabled={!residentDraft.name.trim()}>
                 Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isClearDialogOpen && (
+        <div className="dialog-backdrop" role="presentation">
+          <div className="dialog" role="dialog" aria-modal="true" aria-labelledby="clear-save-title">
+            <div className="dialog-header">
+              <div>
+                <h2 id="clear-save-title">Clear Schedule Data</h2>
+                <p>This will remove the saved browser data for this device and reset the current schedule.</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setIsClearDialogOpen(false)}>
+                <X aria-hidden="true" />
+                <span className="sr-only">Close clear confirmation</span>
+              </button>
+            </div>
+            <div className="dialog-actions">
+              <button type="button" className="secondary" onClick={() => setIsClearDialogOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="primary" onClick={resetLocalData}>
+                Clear Data
               </button>
             </div>
           </div>

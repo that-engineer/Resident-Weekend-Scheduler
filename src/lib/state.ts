@@ -77,6 +77,13 @@ interface PersistedState extends AppState {
   schedulerMetrics?: SchedulerMetricsSnapshot;
 }
 
+export const LOCAL_STATE_STORAGE_KEY = "resident-weekend-scheduler:state";
+
+export interface LoadedPersistedState {
+  state: AppState;
+  schedulerMetrics: SchedulerMetricsSnapshot | null;
+}
+
 export function createMetricsInputSignature(state: AppState): string {
   return hashString(
     JSON.stringify({
@@ -115,11 +122,75 @@ export function serializeState(state: AppState, schedulerMetrics?: SchedulerMetr
   return JSON.stringify(persistedState, null, 2);
 }
 
+export function loadLocalState(storage?: Storage): LoadedPersistedState | null {
+  const targetStorage = storage ?? getLocalStorage();
+  if (!targetStorage) {
+    return null;
+  }
+
+  let raw: string | null;
+  try {
+    raw = targetStorage.getItem(LOCAL_STATE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return parseImportedStateWithMetrics(raw);
+  } catch {
+    try {
+      targetStorage.removeItem(LOCAL_STATE_STORAGE_KEY);
+    } catch {
+      // Ignore storage failures so a corrupt browser save cannot block the app.
+    }
+    return null;
+  }
+}
+
+export function saveLocalState(
+  state: AppState,
+  schedulerMetrics?: SchedulerMetricsSnapshot | null,
+  storage?: Storage,
+): void {
+  const targetStorage = storage ?? getLocalStorage();
+  if (!targetStorage) {
+    return;
+  }
+  try {
+    targetStorage.setItem(LOCAL_STATE_STORAGE_KEY, serializeState(state, schedulerMetrics));
+  } catch {
+    // Ignore quota or privacy-mode failures; import/export remains available.
+  }
+}
+
+export function clearLocalState(storage?: Storage): void {
+  const targetStorage = storage ?? getLocalStorage();
+  if (!targetStorage) {
+    return;
+  }
+  try {
+    targetStorage.removeItem(LOCAL_STATE_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures so reset still clears in-memory state.
+  }
+}
+
 function normalizePoolStatus(value: unknown): PoolStatus {
   if (value === "inPool" || value === "vacation" || value === "requestedOff" || value === "empty") {
     return value;
   }
   return "empty";
+}
+
+function getLocalStorage(): Storage | null {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function parseImportedState(raw: string): AppState {
